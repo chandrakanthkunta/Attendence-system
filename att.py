@@ -11,11 +11,13 @@ from tensorflow.keras.layers import Dense, Flatten, Input
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score
 
+
 # Load Haar Cascade for face detection
 haar_cascade = cv2.CascadeClassifier('haarcascade_frontalface_alt.xml')
 data_dir = "face_data"
 if not os.path.exists(data_dir):
     os.makedirs(data_dir)
+
 
 # Capture faces and display them on Streamlit
 def capture_face(name):
@@ -26,10 +28,6 @@ def capture_face(name):
 
     while True:
         ret, frame = vid.read()
-        if not ret:
-            st.write("Error: Could not read from webcam.")
-            break
-
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
@@ -41,27 +39,31 @@ def capture_face(name):
                 face_roi = gray[y:y + h, x:x + w]
                 face_roi_resized = cv2.resize(face_roi, (100, 100))
                 face_data.append(face_roi_resized)
-
-            count += 1
+                count += 1
 
         # Convert BGR to RGB for Streamlit display
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         stframe.image(frame, channels='RGB')
 
-        if st.button("Stop Capture"):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     vid.release()
+    cv2.destroyAllWindows()
 
     # Save the face data
     np.save(os.path.join(data_dir, f"{name}.npy"), np.array(face_data))
-    st.write(f"Saved {len(face_data)} face images for {name}.")
+
 
 # Prepare the data for model training
 def prepare_data(path):
     npy_files = [file for file in os.listdir(path) if file.endswith('.npy')]
     final_data = []
     final_labels = []
+
+    if not npy_files:
+        st.write("No face data found. Please capture faces first.")
+        return None, None, None  # Return None for no data scenario
 
     for label, npy_file in enumerate(npy_files):
         file_path = os.path.join(path, npy_file)
@@ -70,10 +72,16 @@ def prepare_data(path):
         final_data.append(data)
         final_labels.append(labels)
 
+    # Check if final_data and final_labels are empty
+    if not final_data or not final_labels:
+        st.write("No data available for model training.")
+        return None, None, npy_files
+
     data = np.concatenate(final_data, axis=0)
     labels = np.concatenate(final_labels, axis=0)
     
     return data, labels, npy_files
+
 
 # Build the ANN model
 def build_model(data, labels, epochs):
@@ -95,6 +103,7 @@ def build_model(data, labels, epochs):
 
     return model
 
+
 # Mark attendance in a CSV file
 def mark_attendance(name):
     today_date = datetime.now().strftime('%Y-%m-%d')
@@ -114,6 +123,7 @@ def mark_attendance(name):
             writer.writerow(['Name', 'Datetime'])
         writer.writerow(new_entry)
 
+
 # Recognize faces using the trained model
 def recognize(model, npy_files):
     vid = cv2.VideoCapture(0)
@@ -121,10 +131,6 @@ def recognize(model, npy_files):
 
     while True:
         ret, frame = vid.read()
-        if not ret:
-            st.write("Error: Could not read from webcam.")
-            break
-
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
@@ -146,10 +152,12 @@ def recognize(model, npy_files):
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         stframe.image(frame, channels='RGB')
 
-        if st.button("Stop Recognition"):
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
     vid.release()
+    cv2.destroyAllWindows()
+
 
 # Streamlit UI
 st.title("Smart Face Attendance System")
@@ -168,11 +176,18 @@ if action == "Capture Face":
 
 elif action == 'Build Model':
     data, labels, npy_files = prepare_data(path="face_data")
-    model = build_model(data, labels, epochs=10)
+    if data is not None and labels is not None:
+        model = build_model(data, labels, epochs=10)
+    else:
+        st.write("Model training cannot proceed due to insufficient data.")
 
 elif action == "Mark Attendance":
     if st.sidebar.button("Submit"):
         st.write("Starting face recognition...")
+        st.write("Attendance marked Successfully.")
         data, labels, npy_files = prepare_data(path="face_data")
-        model = build_model(data, labels, epochs=10)
-        recognize(model, npy_files)
+        if data is not None and labels is not None:
+            model = build_model(data, labels, epochs=10)
+            recognize(model, npy_files)
+        else:
+            st.write("Model training cannot proceed due to insufficient data.")
