@@ -55,8 +55,10 @@ def collect_data():
             face_resized = cv2.resize(face, (100, 100))
             face_data.append(face_resized)
 
-        if frame_count % 10 == 0 and len(faces) > 0:  # Save less frequently to reduce overhead
+        if len(face_data) > 0:
+            # Save the collected face data
             np.save(DATA_FILE, np.array(face_data))
+            print(f"Saved {len(face_data)} face images to {DATA_FILE}.")
 
         # Save the current frame instead of displaying it
         cv2.imwrite(f'frames/frame_{frame_count}.jpg', frame)
@@ -73,12 +75,13 @@ def collect_data():
 def preprocess_and_train():
     # Load and preprocess face data
     try:
-        face_data = np.load(DATA_FILE)
+        face_data = np.load(DATA_FILE, allow_pickle=False)  # Prevent loading pickled data
+        print(f"Loaded face data of shape: {face_data.shape}")
         labels = np.array([])  # You need to generate or load actual labels for your data
 
         # Normalize and split data
         X = face_data / 255.0
-        y = to_categorical(labels, NUM_CLASSES)
+        y = to_categorical(labels, NUM_CLASSES)  # Ensure correct labels are provided
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
         # Train the model
@@ -86,16 +89,13 @@ def preprocess_and_train():
 
     except FileNotFoundError:
         print(f"File '{DATA_FILE}' not found. Make sure to collect data first.")
+    except ValueError as e:
+        print(f"ValueError: {e}. Check if the data is in the correct format.")
 
 # Function to perform face recognition and record attendance
 def recognize_and_record():
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    try:
-        model = load_model(MODEL_FILE)
-    except FileNotFoundError:
-        print(f"Model file '{MODEL_FILE}' not found. Train the model first.")
-        return
-    
+    model = load_model(MODEL_FILE)
     cap = cv2.VideoCapture(0)
     csv_file = open(ATTENDANCE_FILE, 'a', newline='')
     csv_writer = csv.writer(csv_file)
@@ -125,8 +125,8 @@ def recognize_and_record():
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             csv_writer.writerow([name, timestamp])
 
+        # Save the current frame instead of displaying it
         cv2.imwrite(f'frames/recognize_frame_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.jpg', frame)
-
 
         # Stop recognizing if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
