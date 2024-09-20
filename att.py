@@ -125,8 +125,8 @@ def recognize_and_record():
             timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             csv_writer.writerow([name, timestamp])
 
-        # Save the current frame instead of displaying it
         cv2.imwrite(f'frames/recognize_frame_{datetime.datetime.now().strftime("%Y%m%d_%H%M%S")}.jpg', frame)
+
 
         # Stop recognizing if 'q' is pressed
         if cv2.waitKey(1) & 0xFF == ord('q'):
