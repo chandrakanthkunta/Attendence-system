@@ -28,6 +28,7 @@ def capture_face(name):
 
     while True:
         ret, frame = vid.read()
+        st.image("frame")
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         faces = haar_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
